@@ -1,7 +1,8 @@
 """Broadlink entities."""
 
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.entity import DeviceInfo, Entity
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
 
@@ -19,6 +20,8 @@ class BroadlinkEntity(Entity):
     async def async_added_to_hass(self):
         """Call when the entity is added to hass."""
         self.async_on_remove(self._coordinator.async_add_listener(self._recv_data))
+        if self._coordinator.data:
+            self._update_state(self._coordinator.data)
 
     async def async_update(self):
         """Update the state of the entity."""
@@ -47,8 +50,8 @@ class BroadlinkEntity(Entity):
 
     @property
     def available(self):
-        """Return True if the remote is available."""
-        return self._device.update_manager.available
+        """Return True if the entity is available."""
+        return self._device.available
 
     @property
     def device_info(self) -> DeviceInfo:

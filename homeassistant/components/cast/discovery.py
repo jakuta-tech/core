@@ -1,9 +1,11 @@
 """Deal with Cast discovery."""
+
 import logging
 import threading
 
 import pychromecast
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EVENT_HOMEASSISTANT_STOP
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.dispatcher import dispatcher_send
@@ -26,32 +28,27 @@ def discover_chromecast(
     """Discover a Chromecast."""
 
     info = ChromecastInfo(
-        services=cast_info.services,
-        uuid=cast_info.uuid,
-        model_name=cast_info.model_name,
-        friendly_name=cast_info.friendly_name,
-        cast_type=cast_info.cast_type,
-        manufacturer=cast_info.manufacturer,
+        cast_info=cast_info,
     )
 
     if info.uuid is None:
         _LOGGER.error("Discovered chromecast without uuid %s", info)
         return
 
-    info = info.fill_out_missing_chromecast_info()
+    info = info.fill_out_missing_chromecast_info(hass)
     _LOGGER.debug("Discovered new or updated chromecast %s", info)
 
     dispatcher_send(hass, SIGNAL_CAST_DISCOVERED, info)
 
 
-def _remove_chromecast(hass: HomeAssistant, info: ChromecastInfo):
+def _remove_chromecast(hass: HomeAssistant, info: ChromecastInfo) -> None:
     # Removed chromecast
     _LOGGER.debug("Removed chromecast %s", info)
 
     dispatcher_send(hass, SIGNAL_CAST_REMOVED, info)
 
 
-def setup_internal_discovery(hass: HomeAssistant, config_entry) -> None:
+def setup_internal_discovery(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Set up the pychromecast internal discovery."""
     if INTERNAL_DISCOVERY_RUNNING_KEY not in hass.data:
         hass.data[INTERNAL_DISCOVERY_RUNNING_KEY] = threading.Lock()
@@ -76,12 +73,7 @@ def setup_internal_discovery(hass: HomeAssistant, config_entry) -> None:
             _remove_chromecast(
                 hass,
                 ChromecastInfo(
-                    services=cast_info.services,
-                    uuid=cast_info.uuid,
-                    model_name=cast_info.model_name,
-                    friendly_name=cast_info.friendly_name,
-                    cast_type=cast_info.cast_type,
-                    manufacturer=cast_info.manufacturer,
+                    cast_info=cast_info,
                 ),
             )
 
@@ -105,7 +97,7 @@ def setup_internal_discovery(hass: HomeAssistant, config_entry) -> None:
     config_entry.add_update_listener(config_entry_updated)
 
 
-async def config_entry_updated(hass, config_entry):
+async def config_entry_updated(hass: HomeAssistant, config_entry: ConfigEntry) -> None:
     """Handle config entry being updated."""
     browser = hass.data[CAST_BROWSER_KEY]
     browser.host_browser.update_hosts(config_entry.data.get(CONF_KNOWN_HOSTS))
