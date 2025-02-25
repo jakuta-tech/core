@@ -1,4 +1,5 @@
 """Support for Sure PetCare Flaps/Pets sensors."""
+
 from __future__ import annotations
 
 from typing import cast
@@ -7,25 +8,21 @@ from surepy.entities import SurepyEntity
 from surepy.entities.devices import Felaqua as SurepyFelaqua
 from surepy.enums import EntityType
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    ATTR_VOLTAGE,
-    DEVICE_CLASS_BATTERY,
-    ENTITY_CATEGORY_DIAGNOSTIC,
-    PERCENTAGE,
-    VOLUME_MILLILITERS,
-)
+from homeassistant.const import ATTR_VOLTAGE, PERCENTAGE, EntityCategory, UnitOfVolume
 from homeassistant.core import HomeAssistant, callback
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import SurePetcareDataCoordinator
 from .const import DOMAIN, SURE_BATT_VOLTAGE_DIFF, SURE_BATT_VOLTAGE_LOW
+from .coordinator import SurePetcareDataCoordinator
 from .entity import SurePetcareEntity
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up Sure PetCare Flaps sensors."""
 
@@ -34,7 +31,6 @@ async def async_setup_entry(
     coordinator: SurePetcareDataCoordinator = hass.data[DOMAIN][entry.entry_id]
 
     for surepy_entity in coordinator.data.values():
-
         if surepy_entity.type in [
             EntityType.CAT_FLAP,
             EntityType.PET_FLAP,
@@ -52,8 +48,8 @@ async def async_setup_entry(
 class SureBattery(SurePetcareEntity, SensorEntity):
     """A sensor implementation for Sure Petcare batteries."""
 
-    _attr_device_class = DEVICE_CLASS_BATTERY
-    _attr_entity_category = ENTITY_CATEGORY_DIAGNOSTIC
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_native_unit_of_measurement = PERCENTAGE
 
     def __init__(
@@ -92,7 +88,8 @@ class SureBattery(SurePetcareEntity, SensorEntity):
 class Felaqua(SurePetcareEntity, SensorEntity):
     """Sure Petcare Felaqua."""
 
-    _attr_native_unit_of_measurement = VOLUME_MILLILITERS
+    _attr_device_class = SensorDeviceClass.VOLUME
+    _attr_native_unit_of_measurement = UnitOfVolume.MILLILITERS
 
     def __init__(
         self, surepetcare_id: int, coordinator: SurePetcareDataCoordinator
@@ -100,7 +97,7 @@ class Felaqua(SurePetcareEntity, SensorEntity):
         """Initialize a Sure Petcare Felaqua sensor."""
         super().__init__(surepetcare_id, coordinator)
 
-        surepy_entity: SurepyFelaqua = coordinator.data[surepetcare_id]
+        surepy_entity = cast(SurepyFelaqua, coordinator.data[surepetcare_id])
 
         self._attr_name = self._device_name
         self._attr_unique_id = self._device_id
