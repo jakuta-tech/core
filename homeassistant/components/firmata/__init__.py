@@ -1,11 +1,11 @@
 """Support for Arduino-compatible Microcontrollers through Firmata."""
-import asyncio
+
 from copy import copy
 import logging
 
 import voluptuous as vol
 
-from homeassistant import config_entries
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import (
     CONF_BINARY_SENSORS,
     CONF_LIGHTS,
@@ -122,6 +122,8 @@ CONFIG_SCHEMA = vol.Schema(
     {DOMAIN: vol.All(cv.ensure_list, [BOARD_CONFIG_SCHEMA])}, extra=vol.ALLOW_EXTRA
 )
 
+type FirmataConfigEntry = ConfigEntry[FirmataBoard]
+
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Firmata domain."""
@@ -150,7 +152,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
             hass.async_create_task(
                 hass.config_entries.flow.async_init(
                     DOMAIN,
-                    context={"source": config_entries.SOURCE_IMPORT},
+                    context={"source": SOURCE_IMPORT},
                     data=firmata_config,
                 )
             )
@@ -159,12 +161,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, config_entry: config_entries.ConfigEntry
+    hass: HomeAssistant, config_entry: FirmataConfigEntry
 ) -> bool:
     """Set up a Firmata board for a config entry."""
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {}
-
     _LOGGER.debug(
         "Setting up Firmata id %s, name %s, config %s",
         config_entry.entry_id,
@@ -177,13 +176,11 @@ async def async_setup_entry(
     if not await board.async_setup():
         return False
 
-    hass.data[DOMAIN][config_entry.entry_id] = board
+    config_entry.runtime_data = board
 
     async def handle_shutdown(event) -> None:
         """Handle shutdown of board when Home Assistant shuts down."""
-        # Ensure board was not already removed previously before shutdown
-        if config_entry.entry_id in hass.data[DOMAIN]:
-            await board.async_reset()
+        await board.async_reset()
 
     config_entry.async_on_unload(
         hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, handle_shutdown)
@@ -192,36 +189,38 @@ async def async_setup_entry(
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
         config_entry_id=config_entry.entry_id,
-        connections={},
+        connections=set(),
         identifiers={(DOMAIN, board.name)},
         manufacturer=FIRMATA_MANUFACTURER,
         name=board.name,
         sw_version=board.firmware_version,
     )
 
-    for (conf, platform) in CONF_PLATFORM_MAP.items():
-        if conf in config_entry.data:
-            hass.async_create_task(
-                hass.config_entries.async_forward_entry_setup(config_entry, platform)
-            )
+    await hass.config_entries.async_forward_entry_setups(
+        config_entry,
+        [
+            platform
+            for conf, platform in CONF_PLATFORM_MAP.items()
+            if conf in config_entry.data
+        ],
+    )
     return True
 
 
 async def async_unload_entry(
-    hass: HomeAssistant, config_entry: config_entries.ConfigEntry
-) -> None:
+    hass: HomeAssistant, config_entry: FirmataConfigEntry
+) -> bool:
     """Shutdown and close a Firmata board for a config entry."""
     _LOGGER.debug("Closing Firmata board %s", config_entry.data[CONF_NAME])
-
-    unload_entries = []
-    for (conf, platform) in CONF_PLATFORM_MAP.items():
-        if conf in config_entry.data:
-            unload_entries.append(
-                hass.config_entries.async_forward_entry_unload(config_entry, platform)
-            )
-    results = []
-    if unload_entries:
-        results = await asyncio.gather(*unload_entries)
-    results.append(await hass.data[DOMAIN].pop(config_entry.entry_id).async_reset())
+    results: list[bool] = []
+    if platforms := [
+        platform
+        for conf, platform in CONF_PLATFORM_MAP.items()
+        if conf in config_entry.data
+    ]:
+        results.append(
+            await hass.config_entries.async_unload_platforms(config_entry, platforms)
+        )
+    results.append(await config_entry.runtime_data.async_reset())
 
     return False not in results

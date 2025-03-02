@@ -1,4 +1,5 @@
 """Provides device conditions for switches."""
+
 from __future__ import annotations
 
 import voluptuous as vol
@@ -20,12 +21,10 @@ CONDITION_SCHEMA = toggle_entity.CONDITION_SCHEMA.extend(
 
 @callback
 def async_condition_from_config(
-    config: ConfigType, config_validation: bool
+    hass: HomeAssistant, config: ConfigType
 ) -> ConditionCheckerType:
     """Evaluate state based on configuration."""
-    if config_validation:
-        config = CONDITION_SCHEMA(config)
-    return toggle_entity.async_condition_from_config(config)
+    return toggle_entity.async_condition_from_config(hass, config)
 
 
 async def async_get_conditions(

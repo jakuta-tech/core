@@ -1,9 +1,12 @@
 """Constants used for mocking data."""
 
-from homeassistant.components import zeroconf
+from ipaddress import ip_address
 
-DISCOVERY_INFO = zeroconf.ZeroconfServiceInfo(
-    host="192.168.0.1",
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+
+DISCOVERY_INFO = ZeroconfServiceInfo(
+    ip_address=ip_address("192.168.0.1"),
+    ip_addresses=[ip_address("192.168.0.1")],
     port=14791,
     hostname="test.local.",
     type="_dvl-deviceapi._tcp.local.",
@@ -19,8 +22,22 @@ DISCOVERY_INFO = zeroconf.ZeroconfServiceInfo(
     },
 )
 
-DISCOVERY_INFO_WRONG_DEVOLO_DEVICE = zeroconf.ZeroconfServiceInfo(
-    properties={"MT": "2700"}
+DISCOVERY_INFO_WRONG_DEVOLO_DEVICE = ZeroconfServiceInfo(
+    ip_address=ip_address("192.168.0.1"),
+    ip_addresses=[ip_address("192.168.0.1")],
+    hostname="mock_hostname",
+    name="mock_name",
+    port=None,
+    properties={"MT": "2700"},
+    type="mock_type",
 )
 
-DISCOVERY_INFO_WRONG_DEVICE = zeroconf.ZeroconfServiceInfo(properties={"Features": ""})
+DISCOVERY_INFO_WRONG_DEVICE = ZeroconfServiceInfo(
+    ip_address=ip_address("192.168.0.1"),
+    ip_addresses=[ip_address("192.168.0.1")],
+    hostname="mock_hostname",
+    name="mock_name",
+    port=None,
+    properties={"Features": ""},
+    type="mock_type",
+)
